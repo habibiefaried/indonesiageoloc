@@ -35,10 +35,10 @@ func topAreaQuery(lat string, lon string, limit int, tipe string) []Address{
         // variable tipe validation
         ret := make([]Address, limit)
         if (strings.Compare(tipe,"village") == 0) || (strings.Compare(tipe,"city") == 0) || (strings.Compare(tipe,"area") == 0) {
-                db := dbConn()
-                var sf float32 = 3.14159 / 180
-                selDB, err := db.Query("SELECT * FROM "+tipe+" ORDER BY ACOS(SIN(lat * ?) *SIN(? * ?) + COS(lat * ?) * COS(? * ?) * COS( (lon-?) * ? )) ASC LIMIT ?", sf, lat, sf, sf, lat, sf, lon, sf, limit)
-                if err != nil {
+            db := dbConn()
+            var sf float32 = 3.14159 / 180
+            selDB, err := db.Query("SELECT * FROM "+tipe+" ORDER BY ACOS(SIN(lat * ?) *SIN(? * ?) + COS(lat * ?) * COS(? * ?) * COS( (lon-?) * ? )) ASC LIMIT ?", sf, lat, sf, sf, lat, sf, lon, sf, limit)
+            if err != nil {
                 fmt.Println(err)
             }
 
@@ -131,9 +131,60 @@ func index(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(rr)
 }
 
+func search(w http.ResponseWriter, r *http.Request) {
+    ret := []Address{}
+
+    w.Header().Set("Content-Type", "application/json")
+    w.Header().Set("Access-Control-Allow-Origin", "*")
+    w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+    w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+    name, ok := r.URL.Query()["name"]
+    if !ok || len(name[0]) < 1 {
+        rr := ResultResponse {
+                Total: 0,
+                Error: "Url Param 'name' is missing",
+        }
+        json.NewEncoder(w).Encode(rr)
+        return
+    }
+
+    db := dbConn()
+    //selDB, err := db.Query("SELECT * FROM `area` WHERE UPPER(name) LIKE UPPER('%/%/%"+name[0]+"%')")
+    keyword := "%/%/%"+name[0]+"%"
+    selDB, err := db.Query("SELECT * FROM `area` WHERE UPPER(name) LIKE UPPER(?)", keyword) // this secure query returned error
+    if err != nil {
+        fmt.Println(err)
+    }
+
+    for selDB.Next() {
+        var id, cityid, name string
+        var latq, longq float32
+        err = selDB.Scan(&id, &cityid, &name, &latq, &longq)
+        if err != nil {
+            fmt.Println(err)
+        }
+
+        a := &Address {
+            ID: id,
+            Full: strings.SplitN(name, "/", -1),
+        }
+
+        ret = append(ret, *a)
+    }
+    db.Close()
+
+    rr := ResultResponse {
+                Total: len(ret),
+                Address: ret,
+            }
+    json.NewEncoder(w).Encode(rr)
+}
+
 func Serve(p string) {
 	DBString = p
 	fmt.Println("Listening on port 18081")
     http.HandleFunc("/", index)
+    http.HandleFunc("/search", search)
     http.ListenAndServe(":18081", nil)
 }
