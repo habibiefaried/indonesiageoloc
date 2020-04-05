@@ -1,6 +1,6 @@
-FROM alpine:latest
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup -h /app
-COPY indonesiageoloc /app/indonesiageoloc
-RUN chown -R appuser:appgroup /app && chmod +x /app/indonesiageoloc
-USER appuser
-# CMD /app/indonesiageoloc serve --DBSTRING "`echo $DBSTRING`"
+FROM ubuntu:latest
+USER root
+WORKDIR /root
+COPY indonesiageoloc /root/indonesiageoloc
+RUN chmod +x indonesiageoloc
+CMD ./indonesiageoloc serve --DBSTRING "`echo $DBSTRING`"
